@@ -91,10 +91,34 @@ export default function BillingSystem() {
   );
   const [rentMonth, setRentMonth] = useState("June");
   const [rentYear, setRentYear] = useState("2026");
-  const [serialNumber, setSerialNumber] = useState("08");
+  const [serialNumber, setSerialNumber] = useState("01");
+  const [paymentMode, setPaymentMode] = useState("NEFT");
 
   // Scaling State for Mobile Preview
   const [scale, setScale] = useState(1);
+
+  // AUTO-INCREMENT LOGIC: Load the last used serial number for the chosen combination
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const storageKey = `17ventures_serial_${biller}_${business}`;
+      const lastUsed = localStorage.getItem(storageKey);
+      if (lastUsed && !isNaN(parseInt(lastUsed))) {
+        // Add 1 to the last used, pad with a leading 0 if needed
+        const nextNumber = parseInt(lastUsed, 10) + 1;
+        setSerialNumber(nextNumber.toString().padStart(2, "0"));
+      } else {
+        // Default starting points based on previous templates if no history exists
+        if (biller === "Dinesh Satra" && business === "Pinnacle Ventures")
+          setSerialNumber("08");
+        else if (
+          biller === "Dinesh Satra" &&
+          business === "SRAR Corporation LLP"
+        )
+          setSerialNumber("57");
+        else setSerialNumber("01");
+      }
+    }
+  }, [biller, business]);
 
   // Hook to handle dynamic file naming based on the current view
   useEffect(() => {
@@ -137,16 +161,30 @@ export default function BillingSystem() {
     return `${day}-${month}-${year}`;
   };
 
-  const initials = biller === "Dinesh Satra" ? "RKV" : "SS";
+  // Determine Invoice Initials based on Business and Biller
+  const getInitials = () => {
+    if (biller === "Sachin Satra") return "SS";
+    if (biller === "Dinesh Satra" && business === "SRAR Corporation LLP")
+      return "DS";
+    return "RKV"; // Default for Dinesh + Pinnacle
+  };
+
   const shortYear = parseInt(rentYear.slice(-2));
   const fiscalYear = `${shortYear}-${shortYear + 1}`;
-  const invoiceNumber = `${initials}/${serialNumber}/${fiscalYear}`;
+  const invoiceNumber = `${getInitials()}/${serialNumber}/${fiscalYear}`;
 
   const handlePrint = () => {
+    // Save the current serial number to local storage before printing
+    if (typeof window !== "undefined") {
+      const storageKey = `17ventures_serial_${biller}_${business}`;
+      // Save the raw integer string (e.g., "8" or "57")
+      localStorage.setItem(storageKey, parseInt(serialNumber, 10).toString());
+    }
+
     window.print();
   };
 
-  // Reusable input class to force text color and prevent iOS inheritance bugs
+  // Reusable input class
   const inputClassName =
     "w-full p-3 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-black outline-none transition-all text-gray-900 font-medium appearance-none";
 
@@ -195,6 +233,9 @@ export default function BillingSystem() {
                     className={inputClassName}
                   >
                     <option value="Pinnacle Ventures">Pinnacle Ventures</option>
+                    <option value="SRAR Corporation LLP">
+                      SRAR Corporation LLP
+                    </option>
                   </select>
                 </div>
               </div>
@@ -291,6 +332,23 @@ export default function BillingSystem() {
                   />
                 </div>
               </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Payment Mode
+                </label>
+                <select
+                  value={paymentMode}
+                  onChange={(e) => setPaymentMode(e.target.value)}
+                  className={inputClassName}
+                >
+                  <option value="NEFT">NEFT</option>
+                  <option value="IMPS">IMPS</option>
+                  <option value="RTGS">RTGS</option>
+                  <option value="Cheque">Cheque</option>
+                  <option value="Cash">Cash</option>
+                </select>
+              </div>
             </div>
 
             <button
@@ -343,10 +401,18 @@ export default function BillingSystem() {
                 <div className="flex justify-between items-start border-b-2 border-black pb-4 mb-6">
                   <div className="w-1/2">
                     <h2 className="font-bold text-lg uppercase">{biller}</h2>
+                    {/* Only show address header for Dinesh Satra and SRAR */}
+                    {biller === "Dinesh Satra" &&
+                      business === "SRAR Corporation LLP" && (
+                        <p className="text-xs font-semibold mt-1 mb-1 pr-4 uppercase">
+                          ADDRESS: Shop No. 40, Fifth Avenue, Rosa Manhattan,
+                          Kasarvadavali, Thane West-400615
+                        </p>
+                      )}
                     {biller === "Dinesh Satra" ? (
-                      <p>GSTIN:- 27AQXPS3256P1ZM</p>
+                      <p className="mt-1">GSTIN:- 27AQXPS3256P1ZM</p>
                     ) : (
-                      <p>PAN NO.:- AQTPS3590E</p>
+                      <p className="mt-1">PAN NO.:- AQTPS3590E</p>
                     )}
                   </div>
                   <div className="w-1/2 text-right">
@@ -364,16 +430,34 @@ export default function BillingSystem() {
                 {/* Client Details */}
                 <div className="mb-8">
                   <p className="font-semibold">To,</p>
-                  <p className="font-bold">PINNACLE VENTURES,</p>
-                  <p>Shop No. 27, Hissa No. 6,</p>
-                  <p>Sun Soman Square,</p>
-                  <p>Agra Road, Sahajanand Chowk,</p>
-                  <p>Kalyan, Thane District, Maharashtra,</p>
-                  <p>Pin Code- 421301</p>
-                  <p>
-                    <span className="font-semibold">GSTIN :</span>{" "}
-                    27ABGFP9078A1Z1
-                  </p>
+
+                  {business === "Pinnacle Ventures" ? (
+                    <>
+                      <p className="font-bold">PINNACLE VENTURES,</p>
+                      <p>Shop No. 27, Hissa No. 6,</p>
+                      <p>Sun Soman Square,</p>
+                      <p>Agra Road, Sahajanand Chowk,</p>
+                      <p>Kalyan, Thane District, Maharashtra,</p>
+                      <p>Pin Code- 421301</p>
+                      <p>
+                        <span className="font-semibold">GSTIN :</span>{" "}
+                        27ABGFP9078A1Z1
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="font-bold">SRAR CORPORATION LLP,</p>
+                      <p>Shop No. 40, Ground Floor,</p>
+                      <p>Fifth Avenue, Rosa Manhattan,</p>
+                      <p>Godhbunder Road, Kasarvadali,</p>
+                      <p>Thane (West), Maharashtra,</p>
+                      <p>Pin Code-400615</p>
+                      <p>
+                        <span className="font-semibold">GSTIN :</span>{" "}
+                        27AFGFS6557R1ZX
+                      </p>
+                    </>
+                  )}
                 </div>
 
                 {/* Table */}
@@ -495,7 +579,7 @@ export default function BillingSystem() {
                     </p>
                     <p>
                       <span className="font-semibold">Mode of Payment:</span>{" "}
-                      NEFT
+                      {paymentMode}
                     </p>
                   </div>
                   <div className="mt-8">
