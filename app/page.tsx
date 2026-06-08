@@ -96,13 +96,23 @@ export default function BillingSystem() {
   // Scaling State for Mobile Preview
   const [scale, setScale] = useState(1);
 
-  // Dynamic Scaling Hook to fit A4 on any screen perfectly
+  // Hook to handle dynamic file naming based on the current view
+  useEffect(() => {
+    if (view === "preview") {
+      const formattedBusiness = business.toUpperCase().replace(/\s+/g, "_");
+      const formattedMonth = rentMonth.toUpperCase();
+      document.title = `${formattedBusiness}_${formattedMonth}_${rentYear}`;
+    } else {
+      document.title = "17 Ventures Invoice Generator";
+    }
+  }, [view, business, rentMonth, rentYear]);
+
+  // Hook for Dynamic Scaling
   useEffect(() => {
     if (view !== "preview") return;
 
     const handleResize = () => {
       const screenWidth = window.innerWidth;
-      // 794px is roughly 210mm at 96 DPI. 32px accounts for padding.
       if (screenWidth < 826) {
         setScale((screenWidth - 32) / 794);
       } else {
@@ -110,7 +120,7 @@ export default function BillingSystem() {
       }
     };
 
-    handleResize(); // Initial calculation
+    handleResize();
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, [view]);
@@ -133,18 +143,12 @@ export default function BillingSystem() {
   const invoiceNumber = `${initials}/${serialNumber}/${fiscalYear}`;
 
   const handlePrint = () => {
-    const originalTitle = document.title;
-    const formattedBusiness = business.toUpperCase().replace(/\s+/g, "_");
-    const formattedMonth = rentMonth.toUpperCase();
-
-    // Changes the file name specifically for the PDF download
-    document.title = `${formattedBusiness}_${formattedMonth}_${rentYear}`;
     window.print();
-
-    setTimeout(() => {
-      document.title = originalTitle;
-    }, 500);
   };
+
+  // Reusable input class to force text color and prevent iOS inheritance bugs
+  const inputClassName =
+    "w-full p-3 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-black outline-none transition-all text-gray-900 font-medium appearance-none";
 
   return (
     <>
@@ -175,7 +179,7 @@ export default function BillingSystem() {
                   <select
                     value={biller}
                     onChange={(e) => setBiller(e.target.value)}
-                    className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-black outline-none transition-all"
+                    className={inputClassName}
                   >
                     <option value="Dinesh Satra">Dinesh Satra</option>
                     <option value="Sachin Satra">Sachin Satra</option>
@@ -188,7 +192,7 @@ export default function BillingSystem() {
                   <select
                     value={business}
                     onChange={(e) => setBusiness(e.target.value)}
-                    className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-black outline-none transition-all"
+                    className={inputClassName}
                   >
                     <option value="Pinnacle Ventures">Pinnacle Ventures</option>
                   </select>
@@ -203,7 +207,7 @@ export default function BillingSystem() {
                   <select
                     value={rentMonth}
                     onChange={(e) => setRentMonth(e.target.value)}
-                    className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-black outline-none transition-all"
+                    className={inputClassName}
                   >
                     {[
                       "January",
@@ -233,7 +237,7 @@ export default function BillingSystem() {
                     type="text"
                     value={rentYear}
                     onChange={(e) => setRentYear(e.target.value)}
-                    className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-black outline-none transition-all"
+                    className={inputClassName}
                   />
                 </div>
               </div>
@@ -247,7 +251,7 @@ export default function BillingSystem() {
                     type="text"
                     value={serialNumber}
                     onChange={(e) => setSerialNumber(e.target.value)}
-                    className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-black outline-none transition-all"
+                    className={inputClassName}
                   />
                 </div>
                 <div>
@@ -258,7 +262,7 @@ export default function BillingSystem() {
                     type="number"
                     value={baseAmount}
                     onChange={(e) => setBaseAmount(Number(e.target.value))}
-                    className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-black outline-none transition-all"
+                    className={inputClassName}
                   />
                 </div>
               </div>
@@ -272,7 +276,7 @@ export default function BillingSystem() {
                     type="date"
                     value={billingDate}
                     onChange={(e) => setBillingDate(e.target.value)}
-                    className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-black outline-none transition-all"
+                    className={inputClassName}
                   />
                 </div>
                 <div>
@@ -283,7 +287,7 @@ export default function BillingSystem() {
                     type="date"
                     value={receiptDate}
                     onChange={(e) => setReceiptDate(e.target.value)}
-                    className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-black outline-none transition-all"
+                    className={inputClassName}
                   />
                 </div>
               </div>
@@ -303,7 +307,6 @@ export default function BillingSystem() {
       {/* VIEW 2: DOCUMENT PREVIEW */}
       {view === "preview" && (
         <div className="min-h-screen bg-gray-200 flex flex-col font-sans print:bg-white">
-          {/* Sticky Navigation Bar (Hidden on Print) */}
           <div className="sticky top-0 z-50 bg-white border-b border-gray-300 px-4 py-4 sm:px-8 flex justify-between items-center shadow-sm print:hidden">
             <button
               onClick={() => setView("edit")}
@@ -324,14 +327,11 @@ export default function BillingSystem() {
             </button>
           </div>
 
-          {/* Scaled A4 Document Container */}
           <div className="flex-1 w-full flex justify-center py-8 print:py-0 overflow-hidden">
-            {/* The wrapper that applies the dynamic scale for mobile screens */}
             <div
               className="origin-top print:!scale-100 print:!transform-none"
               style={{
                 transform: `scale(${scale})`,
-                // We multiply the A4 height by the scale so the container doesn't leave a massive blank void on mobile
                 height: scale < 1 ? `${1122 * scale}px` : "auto",
               }}
             >
