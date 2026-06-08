@@ -1,7 +1,9 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { ArrowLeft, Download, Eye } from "lucide-react";
+import { ArrowLeft, Download, Eye, Loader2 } from "lucide-react";
+import html2canvas from "html2canvas";
+import { jsPDF } from "jspdf";
 
 // Helper to convert numbers to Indian Rupee words
 const numberToWords = (num: number) => {
@@ -78,6 +80,7 @@ const numberToWords = (num: number) => {
 export default function BillingSystem() {
   // Navigation State
   const [view, setView] = useState<"edit" | "preview">("edit");
+  const [isDownloading, setIsDownloading] = useState(false);
 
   // Form State
   const [biller, setBiller] = useState("Dinesh Satra");
@@ -119,17 +122,6 @@ export default function BillingSystem() {
       }
     }
   }, [biller, business]);
-
-  // Hook to handle dynamic file naming based on the current view
-  useEffect(() => {
-    if (view === "preview") {
-      const formattedBusiness = business.toUpperCase().replace(/\s+/g, "_");
-      const formattedMonth = rentMonth.toUpperCase();
-      document.title = `${formattedBusiness}_${formattedMonth}_${rentYear}`;
-    } else {
-      document.title = "17 Ventures Invoice Generator";
-    }
-  }, [view, business, rentMonth, rentYear]);
 
   // Hook for Dynamic Scaling
   useEffect(() => {
@@ -173,15 +165,66 @@ export default function BillingSystem() {
   const fiscalYear = `${shortYear}-${shortYear + 1}`;
   const invoiceNumber = `${getInitials()}/${serialNumber}/${fiscalYear}`;
 
-  const handlePrint = () => {
-    // Save the current serial number to local storage before printing
-    if (typeof window !== "undefined") {
-      const storageKey = `17ventures_serial_${biller}_${business}`;
-      // Save the raw integer string (e.g., "8" or "57")
-      localStorage.setItem(storageKey, parseInt(serialNumber, 10).toString());
+  const handleDownloadPDF = async () => {
+    setIsDownloading(true);
+
+    const wrapper = document.getElementById("scale-wrapper");
+    const element = document.getElementById("invoice-document");
+
+    if (!wrapper || !element) {
+      setIsDownloading(false);
+      return;
     }
 
-    window.print();
+    // 1. Save original scale and temporarily set it to 1 to prevent capture bugs
+    const originalTransform = wrapper.style.transform;
+    wrapper.style.transform = "scale(1)";
+
+    // 2. Wait a split second for the DOM to update
+    setTimeout(async () => {
+      try {
+        // 3. Capture high-res canvas
+        const canvas = await html2canvas(element, {
+          scale: 2, // 2x resolution for crispness
+          useCORS: true,
+          backgroundColor: "#ffffff",
+        });
+
+        const imgData = canvas.toDataURL("image/png");
+
+        // 4. Create PDF
+        const pdf = new jsPDF({
+          orientation: "portrait",
+          unit: "mm",
+          format: "a4",
+        });
+
+        const pdfWidth = pdf.internal.pageSize.getWidth();
+        const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+
+        pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight);
+
+        // 5. Save the state for Auto-incrementing
+        if (typeof window !== "undefined") {
+          const storageKey = `17ventures_serial_${biller}_${business}`;
+          localStorage.setItem(
+            storageKey,
+            parseInt(serialNumber, 10).toString(),
+          );
+        }
+
+        // 6. Format file name and trigger download
+        const formattedBusiness = business.toUpperCase().replace(/\s+/g, "_");
+        const formattedMonth = rentMonth.toUpperCase();
+        pdf.save(`${formattedBusiness}_${formattedMonth}_${rentYear}.pdf`);
+      } catch (error) {
+        console.error("PDF generation failed", error);
+      } finally {
+        // 7. Restore the scale and turn off the loading spinner
+        wrapper.style.transform = originalTransform;
+        setIsDownloading(false);
+      }
+    }, 150);
   };
 
   // Reusable input class
@@ -190,13 +233,6 @@ export default function BillingSystem() {
 
   return (
     <>
-      <style>{`
-        @media print {
-          @page { margin: 0; }
-          body { -webkit-print-color-adjust: exact; print-color-adjust: exact; background: white; }
-        }
-      `}</style>
-
       {/* VIEW 1: EDIT FORM */}
       {view === "edit" && (
         <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4 sm:p-8 font-sans">
@@ -364,8 +400,8 @@ export default function BillingSystem() {
 
       {/* VIEW 2: DOCUMENT PREVIEW */}
       {view === "preview" && (
-        <div className="min-h-screen bg-gray-200 flex flex-col font-sans print:bg-white">
-          <div className="sticky top-0 z-50 bg-white border-b border-gray-300 px-4 py-4 sm:px-8 flex justify-between items-center shadow-sm print:hidden">
+        <div className="min-h-screen bg-gray-200 flex flex-col font-sans">
+          <div className="sticky top-0 z-50 bg-white border-b border-gray-300 px-4 py-4 sm:px-8 flex justify-between items-center shadow-sm">
             <button
               onClick={() => setView("edit")}
               className="flex items-center gap-2 text-gray-700 font-semibold hover:text-black transition-colors"
@@ -376,25 +412,40 @@ export default function BillingSystem() {
             </button>
 
             <button
-              onClick={handlePrint}
-              className="bg-black text-white px-5 py-2.5 rounded-lg font-bold flex items-center gap-2 hover:bg-gray-800 transition-colors active:scale-[0.98]"
+              onClick={handleDownloadPDF}
+              disabled={isDownloading}
+              className={`px-5 py-2.5 rounded-lg font-bold flex items-center gap-2 transition-colors active:scale-[0.98] ${
+                isDownloading
+                  ? "bg-gray-500 text-white cursor-not-allowed"
+                  : "bg-black text-white hover:bg-gray-800"
+              }`}
             >
-              <Download size={18} />
-              <span className="hidden sm:inline">Download PDF</span>
-              <span className="sm:hidden">Save</span>
+              {isDownloading ? (
+                <Loader2 className="animate-spin" size={18} />
+              ) : (
+                <Download size={18} />
+              )}
+              <span className="hidden sm:inline">
+                {isDownloading ? "Generating..." : "Download PDF"}
+              </span>
+              <span className="sm:hidden">
+                {isDownloading ? "..." : "Save"}
+              </span>
             </button>
           </div>
 
-          <div className="flex-1 w-full flex justify-center py-8 print:py-0 overflow-hidden">
+          <div className="flex-1 w-full flex justify-center py-8 overflow-hidden">
             <div
-              className="origin-top print:!scale-100 print:!transform-none"
+              id="scale-wrapper"
+              className="origin-top"
               style={{
                 transform: `scale(${scale})`,
                 height: scale < 1 ? `${1122 * scale}px` : "auto",
               }}
             >
               <div
-                className="bg-white shadow-2xl p-10 text-sm text-black relative print:shadow-none print:w-[210mm] print:h-[297mm] print:p-12 contenteditable focus:outline-none"
+                id="invoice-document"
+                className="bg-white shadow-2xl p-10 text-sm text-black relative contenteditable focus:outline-none"
                 style={{ width: "210mm", minHeight: "297mm" }}
               >
                 {/* Header Row */}
