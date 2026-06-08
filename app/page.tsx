@@ -1,65 +1,515 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import React, { useState, useEffect } from "react";
+import { ArrowLeft, Download, Eye } from "lucide-react";
+
+// Helper to convert numbers to Indian Rupee words
+const numberToWords = (num: number) => {
+  const a = [
+    "",
+    "One",
+    "Two",
+    "Three",
+    "Four",
+    "Five",
+    "Six",
+    "Seven",
+    "Eight",
+    "Nine",
+    "Ten",
+    "Eleven",
+    "Twelve",
+    "Thirteen",
+    "Fourteen",
+    "Fifteen",
+    "Sixteen",
+    "Seventeen",
+    "Eighteen",
+    "Nineteen",
+  ];
+  const b = [
+    "",
+    "",
+    "Twenty",
+    "Thirty",
+    "Forty",
+    "Fifty",
+    "Sixty",
+    "Seventy",
+    "Eighty",
+    "Ninety",
+  ];
+
+  if (num === 0) return "Zero";
+  if (num > 999999999) return "Overflow";
+
+  const convert = (n: number): string => {
+    if (n < 20) return a[n];
+    if (n < 100)
+      return b[Math.floor(n / 10)] + (n % 10 !== 0 ? "-" + a[n % 10] : "");
+    if (n < 1000)
+      return (
+        a[Math.floor(n / 100)] +
+        " Hundred" +
+        (n % 100 !== 0 ? " and " + convert(n % 100) : "")
+      );
+    if (n < 100000)
+      return (
+        convert(Math.floor(n / 1000)) +
+        " Thousand" +
+        (n % 1000 !== 0 ? " " + convert(n % 1000) : "")
+      );
+    if (n < 10000000)
+      return (
+        convert(Math.floor(n / 100000)) +
+        " Lakh" +
+        (n % 100000 !== 0 ? " " + convert(n % 100000) : "")
+      );
+    return (
+      convert(Math.floor(n / 10000000)) +
+      " Crore" +
+      (n % 10000000 !== 0 ? " " + convert(n % 10000000) : "")
+    );
+  };
+
+  return convert(num) + " only";
+};
+
+export default function BillingSystem() {
+  // Navigation State
+  const [view, setView] = useState<"edit" | "preview">("edit");
+
+  // Form State
+  const [biller, setBiller] = useState("Dinesh Satra");
+  const [business, setBusiness] = useState("Pinnacle Ventures");
+  const [baseAmount, setBaseAmount] = useState(65000);
+  const [billingDate, setBillingDate] = useState(
+    new Date().toISOString().split("T")[0],
+  );
+  const [receiptDate, setReceiptDate] = useState(
+    new Date().toISOString().split("T")[0],
+  );
+  const [rentMonth, setRentMonth] = useState("June");
+  const [rentYear, setRentYear] = useState("2026");
+  const [serialNumber, setSerialNumber] = useState("08");
+
+  // Scaling State for Mobile Preview
+  const [scale, setScale] = useState(1);
+
+  // Dynamic Scaling Hook to fit A4 on any screen perfectly
+  useEffect(() => {
+    if (view !== "preview") return;
+
+    const handleResize = () => {
+      const screenWidth = window.innerWidth;
+      // 794px is roughly 210mm at 96 DPI. 32px accounts for padding.
+      if (screenWidth < 826) {
+        setScale((screenWidth - 32) / 794);
+      } else {
+        setScale(1);
+      }
+    };
+
+    handleResize(); // Initial calculation
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, [view]);
+
+  // Derived Calculations
+  const taxRate = biller === "Dinesh Satra" ? 0.09 : 0;
+  const cgst = baseAmount * taxRate;
+  const sgst = baseAmount * taxRate;
+  const totalAmount = baseAmount + cgst + sgst;
+
+  const formatDate = (dateStr: string) => {
+    if (!dateStr) return "";
+    const [year, month, day] = dateStr.split("-");
+    return `${day}-${month}-${year}`;
+  };
+
+  const initials = biller === "Dinesh Satra" ? "RKV" : "SS";
+  const shortYear = parseInt(rentYear.slice(-2));
+  const fiscalYear = `${shortYear}-${shortYear + 1}`;
+  const invoiceNumber = `${initials}/${serialNumber}/${fiscalYear}`;
+
+  const handlePrint = () => {
+    const originalTitle = document.title;
+    const formattedBusiness = business.toUpperCase().replace(/\s+/g, "_");
+    const formattedMonth = rentMonth.toUpperCase();
+
+    // Changes the file name specifically for the PDF download
+    document.title = `${formattedBusiness}_${formattedMonth}_${rentYear}`;
+    window.print();
+
+    setTimeout(() => {
+      document.title = originalTitle;
+    }, 500);
+  };
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+    <>
+      <style>{`
+        @media print {
+          @page { margin: 0; }
+          body { -webkit-print-color-adjust: exact; print-color-adjust: exact; background: white; }
+        }
+      `}</style>
+
+      {/* VIEW 1: EDIT FORM */}
+      {view === "edit" && (
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4 sm:p-8 font-sans">
+          <div className="w-full max-w-2xl bg-white shadow-sm border border-gray-200 rounded-xl p-6 sm:p-10">
+            <div className="mb-8">
+              <h1 className="text-3xl font-extrabold tracking-tight text-gray-900">
+                17 Ventures
+              </h1>
+              <p className="text-gray-500 mt-1">Invoice Generation System</p>
+            </div>
+
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Biller
+                  </label>
+                  <select
+                    value={biller}
+                    onChange={(e) => setBiller(e.target.value)}
+                    className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-black outline-none transition-all"
+                  >
+                    <option value="Dinesh Satra">Dinesh Satra</option>
+                    <option value="Sachin Satra">Sachin Satra</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Business
+                  </label>
+                  <select
+                    value={business}
+                    onChange={(e) => setBusiness(e.target.value)}
+                    className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-black outline-none transition-all"
+                  >
+                    <option value="Pinnacle Ventures">Pinnacle Ventures</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Rent Month
+                  </label>
+                  <select
+                    value={rentMonth}
+                    onChange={(e) => setRentMonth(e.target.value)}
+                    className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-black outline-none transition-all"
+                  >
+                    {[
+                      "January",
+                      "February",
+                      "March",
+                      "April",
+                      "May",
+                      "June",
+                      "July",
+                      "August",
+                      "September",
+                      "October",
+                      "November",
+                      "December",
+                    ].map((m) => (
+                      <option key={m} value={m}>
+                        {m}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Rent Year
+                  </label>
+                  <input
+                    type="text"
+                    value={rentYear}
+                    onChange={(e) => setRentYear(e.target.value)}
+                    className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-black outline-none transition-all"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Serial No.
+                  </label>
+                  <input
+                    type="text"
+                    value={serialNumber}
+                    onChange={(e) => setSerialNumber(e.target.value)}
+                    className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-black outline-none transition-all"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Amount (Pre-tax)
+                  </label>
+                  <input
+                    type="number"
+                    value={baseAmount}
+                    onChange={(e) => setBaseAmount(Number(e.target.value))}
+                    className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-black outline-none transition-all"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Billing Date
+                  </label>
+                  <input
+                    type="date"
+                    value={billingDate}
+                    onChange={(e) => setBillingDate(e.target.value)}
+                    className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-black outline-none transition-all"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Receipt Date
+                  </label>
+                  <input
+                    type="date"
+                    value={receiptDate}
+                    onChange={(e) => setReceiptDate(e.target.value)}
+                    className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-black outline-none transition-all"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setView("preview")}
+              className="mt-10 w-full bg-black text-white p-4 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-gray-800 transition-all active:scale-[0.98]"
             >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+              <Eye size={20} />
+              Preview Invoice
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* VIEW 2: DOCUMENT PREVIEW */}
+      {view === "preview" && (
+        <div className="min-h-screen bg-gray-200 flex flex-col font-sans print:bg-white">
+          {/* Sticky Navigation Bar (Hidden on Print) */}
+          <div className="sticky top-0 z-50 bg-white border-b border-gray-300 px-4 py-4 sm:px-8 flex justify-between items-center shadow-sm print:hidden">
+            <button
+              onClick={() => setView("edit")}
+              className="flex items-center gap-2 text-gray-700 font-semibold hover:text-black transition-colors"
             >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+              <ArrowLeft size={20} />
+              <span className="hidden sm:inline">Back to Edit</span>
+              <span className="sm:hidden">Back</span>
+            </button>
+
+            <button
+              onClick={handlePrint}
+              className="bg-black text-white px-5 py-2.5 rounded-lg font-bold flex items-center gap-2 hover:bg-gray-800 transition-colors active:scale-[0.98]"
+            >
+              <Download size={18} />
+              <span className="hidden sm:inline">Download PDF</span>
+              <span className="sm:hidden">Save</span>
+            </button>
+          </div>
+
+          {/* Scaled A4 Document Container */}
+          <div className="flex-1 w-full flex justify-center py-8 print:py-0 overflow-hidden">
+            {/* The wrapper that applies the dynamic scale for mobile screens */}
+            <div
+              className="origin-top print:!scale-100 print:!transform-none"
+              style={{
+                transform: `scale(${scale})`,
+                // We multiply the A4 height by the scale so the container doesn't leave a massive blank void on mobile
+                height: scale < 1 ? `${1122 * scale}px` : "auto",
+              }}
+            >
+              <div
+                className="bg-white shadow-2xl p-10 text-sm text-black relative print:shadow-none print:w-[210mm] print:h-[297mm] print:p-12 contenteditable focus:outline-none"
+                style={{ width: "210mm", minHeight: "297mm" }}
+              >
+                {/* Header Row */}
+                <div className="flex justify-between items-start border-b-2 border-black pb-4 mb-6">
+                  <div className="w-1/2">
+                    <h2 className="font-bold text-lg uppercase">{biller}</h2>
+                    {biller === "Dinesh Satra" ? (
+                      <p>GSTIN:- 27AQXPS3256P1ZM</p>
+                    ) : (
+                      <p>PAN NO.:- AQTPS3590E</p>
+                    )}
+                  </div>
+                  <div className="w-1/2 text-right">
+                    <p>
+                      <span className="font-semibold">DATE:-</span>{" "}
+                      {formatDate(billingDate)}
+                    </p>
+                    <p>
+                      <span className="font-semibold">INVOICE No.:-</span>{" "}
+                      {invoiceNumber}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Client Details */}
+                <div className="mb-8">
+                  <p className="font-semibold">To,</p>
+                  <p className="font-bold">PINNACLE VENTURES,</p>
+                  <p>Shop No. 27, Hissa No. 6,</p>
+                  <p>Sun Soman Square,</p>
+                  <p>Agra Road, Sahajanand Chowk,</p>
+                  <p>Kalyan, Thane District, Maharashtra,</p>
+                  <p>Pin Code- 421301</p>
+                  <p>
+                    <span className="font-semibold">GSTIN :</span>{" "}
+                    27ABGFP9078A1Z1
+                  </p>
+                </div>
+
+                {/* Table */}
+                <table className="w-full border-collapse border border-black mb-6">
+                  <thead>
+                    <tr className="border-b border-black text-left">
+                      <th className="p-2 border-r border-black w-16 text-center">
+                        Sr. No.
+                      </th>
+                      <th className="p-2 border-r border-black">
+                        ITEM DESCRIPTIONS
+                      </th>
+                      <th className="p-2 text-right w-40">TAXABLE VALUE</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td className="p-2 border-r border-black text-center align-top pt-4">
+                        1.
+                      </td>
+                      <td className="p-2 border-r border-black font-bold align-top pt-4">
+                        RENTING OF IMMOVABLE PROPERTY SERVICE FOR THE MONTH OF{" "}
+                        {rentMonth.toUpperCase()} {rentYear}
+                      </td>
+                      <td className="p-2 text-right align-top pt-4 font-bold">
+                        {baseAmount.toLocaleString("en-IN", {
+                          minimumFractionDigits: 2,
+                        })}
+                      </td>
+                    </tr>
+
+                    <tr>
+                      <td className="p-4 border-r border-black"></td>
+                      <td className="border-r border-black"></td>
+                      <td></td>
+                    </tr>
+
+                    <tr>
+                      <td className="p-2 border-r border-black"></td>
+                      <td className="p-2 border-r border-black flex justify-between">
+                        <span>NET AMOUNT</span>
+                        <span>.</span>
+                      </td>
+                      <td className="p-2 text-right">
+                        {baseAmount.toLocaleString("en-IN", {
+                          minimumFractionDigits: 2,
+                        })}
+                      </td>
+                    </tr>
+
+                    {biller === "Dinesh Satra" && (
+                      <>
+                        <tr>
+                          <td className="p-2 border-r border-black"></td>
+                          <td className="p-2 border-r border-black flex justify-between">
+                            <span>OUTPUT CGST 9%</span>
+                            <span>.</span>
+                          </td>
+                          <td className="p-2 text-right">
+                            {cgst.toLocaleString("en-IN", {
+                              minimumFractionDigits: 2,
+                            })}
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className="p-2 border-r border-black"></td>
+                          <td className="p-2 border-r border-black flex justify-between">
+                            <span>OUTPUT SGST 9%</span>
+                            <span>.</span>
+                          </td>
+                          <td className="p-2 text-right">
+                            {sgst.toLocaleString("en-IN", {
+                              minimumFractionDigits: 2,
+                            })}
+                          </td>
+                        </tr>
+                      </>
+                    )}
+
+                    <tr className="border-t border-black font-bold">
+                      <td className="p-2 border-r border-black"></td>
+                      <td className="p-2 border-r border-black text-right">
+                        TOTAL
+                      </td>
+                      <td className="p-2 text-right">
+                        {totalAmount.toLocaleString("en-IN", {
+                          minimumFractionDigits: 2,
+                        })}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+
+                <div className="mb-16">
+                  <p className="font-semibold">
+                    Total Invoice Value (In Words)
+                  </p>
+                  <p className="capitalize">{numberToWords(totalAmount)}.</p>
+                </div>
+
+                <div className="flex justify-end mb-12">
+                  <p className="font-bold mr-10">AUTHORISED SIGNATORY</p>
+                </div>
+
+                {/* Receipt Section */}
+                <div className="border-t-2 border-dashed border-gray-400 pt-6 mt-8 flex justify-between items-start">
+                  <div>
+                    <p className="font-bold underline mb-2">Receipt</p>
+                    <p>
+                      <span className="font-semibold">Invoice No.:</span>{" "}
+                      {invoiceNumber}
+                    </p>
+                    <p>
+                      <span className="font-semibold">Amount :</span> Rs.{" "}
+                      {totalAmount.toLocaleString("en-IN")} /-
+                    </p>
+                    <p>
+                      <span className="font-semibold">Status:</span> Received
+                    </p>
+                    <p>
+                      <span className="font-semibold">Mode of Payment:</span>{" "}
+                      NEFT
+                    </p>
+                  </div>
+                  <div className="mt-8">
+                    <p>
+                      <span className="font-semibold">Date:</span>{" "}
+                      {formatDate(receiptDate)}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+      )}
+    </>
   );
 }
